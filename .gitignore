@@ -1,0 +1,22 @@
+# Go
+/enclave/secure-git-signer-enclave
+/client/git-enclave-signer
+*.test
+coverage.out
+
+# Build artifacts
+*.eif
+/build/*.eif
+pcr0.txt
+
+# CDK / Node
+node_modules/
+/iac/cdk.out/
+/iac/*.js
+/iac/*.d.ts
+!/iac/jest.config.js
+.env
+
+# Editor / OS
+.DS_Store
+*.swp
