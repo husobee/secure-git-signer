@@ -1,0 +1,33 @@
+# Builds the container image that nitro-cli packages into an Enclave Image File
+# (EIF). Three stages: our signing app, the nitriding TLS daemon, and a minimal
+# Amazon Linux runtime that holds both plus the entrypoint.
+#
+# Reproducibility note: the enclave's PCR0 measurement is a hash of this image.
+# For a *stable* PCR0 you must pin every base image by digest (e.g.
+# golang@sha256:…) and vendor your Go dependencies, so the bytes never drift.
+# This example uses version tags to stay buildable out of the box; swap them for
+# digests when you care about a fixed PCR0.
+
+# ── Stage 1: the signing app (static, no CGO) ────────────────────────────────
+FROM golang:1.26 AS app
+WORKDIR /build
+COPY enclave/ .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" \
+    -o /secure-git-signer-enclave .
+
+# ── Stage 2: nitriding-daemon (terminates TLS inside the enclave) ────────────
+FROM golang:1.26 AS nitriding
+RUN git clone --depth=1 --branch v1.4.2 \
+    https://github.com/brave/nitriding-daemon /nitriding-src
+WORKDIR /nitriding-src
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -buildvcs=false -ldflags="-s -w -buildid=" -o /nitriding .
+
+# ── Stage 3: minimal runtime nitro-cli will turn into the EIF ────────────────
+FROM amazonlinux:2023
+COPY --from=app       /secure-git-signer-enclave /secure-git-signer-enclave
+COPY --from=nitriding /nitriding                 /nitriding
+COPY build/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
