@@ -39,6 +39,11 @@ func main() {
 	}
 
 	switch first(args) {
+	case "attest":
+		if err := runAttest(args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "git-enclave-signer:", err)
+			os.Exit(1)
+		}
 	case "help", "-h", "--help", "":
 		usage()
 	default:
