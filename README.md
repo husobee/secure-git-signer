@@ -59,9 +59,13 @@ enclave boot. A production system that needs a *persistent* signing identity
 would wrap the key with AWS KMS and gate its release on the enclave's PCR0
 measurement, so only an enclave running this exact code can decrypt it. That
 (plus IAM credential plumbing and a real ACME-issued certificate) is a natural
-next step but is intentionally out of scope here. Because TLS is self-signed,
-the enclave needs no outbound network, so there is also no `gvproxy` / L2 tunnel
-to configure.
+next step but is intentionally out of scope here.
+
+Because TLS is **self-signed** rather than ACME-issued, the enclave needs no
+public DNS name, no port-443 raw-TCP load balancer, and no Let's Encrypt round
+trip. `gvproxy` still runs on the host — nitriding uses it to bring up its
+network stack — but nothing in the signing flow depends on outbound internet
+from inside the enclave.
 
 ## Layout
 
