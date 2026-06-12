@@ -30,26 +30,24 @@ Good "git" signature with ED25519 key SHA256:…
 …except no human, and no process outside the enclave, ever held the private key.
 
 ## Architecture
-
-```
- your laptop                          AWS EC2 (Nitro-enabled host)
- ───────────                          ────────────────────────────
-                                      ┌───────────────── parent instance ──────────────────┐
- git commit -S                        │  run-enclave.sh:                                    │
-   │                                  │    socat TCP:443 ⇆ vsock:CID:443   (inbound bridge) │
-   │ gpg.ssh.program                  │    nitro-cli run-enclave app.eif                    │
-   ▼                                  │                                                     │
- git-enclave-signer ───TLS:443───────────────▶ ┌──────────── enclave ────────────────────┐ │
-   (client shim)        (self-signed,│          │ nitriding-daemon (TLS termination)      │ │
-                         attestation- │          │      │ http://127.0.0.1:8081            │ │
-                         bound)       │          │      ▼                                  │ │
-   POST /sign {namespace,data} ───────────────────▶ enclave app                           │ │
-   ◀── armored SSH SIGNATURE ──────────────────────  • ed25519 key (generated on boot)     │ │
-                                      │          │   • never leaves the enclave            │ │
-   GET /attestation?nonce=… ──────────────────────▶ • NSM doc binds sha256(pubkey)+PCR0    │ │
-   ◀── COSE-signed NSM document ───────────────────                                        │ │
-                                      │          └─────────────────────────────────────────┘ │
-                                      └─────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph laptop["Your laptop"]
+    git["git commit -S"]
+    shim["git-enclave-signer<br/>(the shim)"]
+  end
+  subgraph host["EC2 Nitro host (parent)"]
+    runner["run-enclave.sh<br/>socat bridge + gvproxy"]
+    subgraph enc["Nitro Enclave"]
+      nit["nitriding<br/>TLS termination"]
+      app["signer app<br/>ed25519 key + NSM"]
+    end
+  end
+  git -->|gpg.ssh.program| shim
+  shim -->|"HTTPS :443"| runner
+  runner -->|vsock| nit
+  nit -->|"http 127.0.0.1:8081"| app
+  app -.->|"attestation + signatures"| shim
 ```
 
 ### What this example leaves out
